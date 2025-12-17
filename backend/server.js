@@ -13,6 +13,9 @@ const allowedOrigins = [
 app.use(cors({
   origin: function(origin, callback){
     if(!origin) return callback(null, true); // allow curl/Postman
+    // Allow any chrome-extension
+    if(origin.startsWith("chrome-extension://")) return callback(null, true);
+    // Check against other allowed origins
     if(allowedOrigins.indexOf(origin) === -1){
       const msg = 'CORS policy: This origin is not allowed';
       return callback(new Error(msg), false);
@@ -21,6 +24,7 @@ app.use(cors({
   },
   methods: ["GET","POST","PUT","DELETE","OPTIONS"]
 }));
+
 
 
 app.use(express.json());
