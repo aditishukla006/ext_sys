@@ -22,6 +22,15 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
+router.get("/positive", async (req, res) => {
+  const data = await Keyword.find({ type: "positive" }).sort({ createdAt: -1 });
+  res.json(data.map(k => k.keyword));
+});
+router.get("/negative", async (req, res) => {
+  const data = await Keyword.find({ type: "negative" }).sort({ createdAt: -1 });
+  res.json(data.map(k => k.keyword));
+});
+
 //get all keywords
 router.get("/", async (req, res) => {
   const data = await Keyword.find().sort({ createdAt: -1 });
@@ -32,7 +41,7 @@ router.get("/", async (req, res) => {
  * POST → add single OR multiple keywords
  * body: { keywords: ["a", "b"] } OR { keyword: "a" }
  */
-router.post("/", async (req, res) => {
+/*router.post("/", async (req, res) => {
   console.log("REQ.BODY:", req.body);
   try {
     let keywords = [];
@@ -70,7 +79,47 @@ router.post("/", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
+});*/
+router.post("/", async (req, res) => {
+  try {
+    let { keyword, keywords, type } = req.body;
+
+    if (!type) type = "positive"; // default
+
+    let list = [];
+
+    if (Array.isArray(keywords)) list = keywords;
+    else if (keyword) list = [keyword];
+    else return res.status(400).json({ error: "Keyword required" });
+
+    list = [...new Set(
+      list.map(k => k.toLowerCase().trim()).filter(Boolean)
+    )];
+
+    const existing = await Keyword.find({
+      keyword: { $in: list },
+      type
+    });
+
+    const existingSet = new Set(existing.map(e => e.keyword));
+
+    const newItems = list
+      .filter(k => !existingSet.has(k))
+      .map(k => ({ keyword: k, type }));
+
+    if (newItems.length) await Keyword.insertMany(newItems);
+
+    res.json({
+      success: true,
+      added: newItems.map(k => k.keyword),
+      skipped: [...existingSet]
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
+
  
 //update keyword
 router.put("/", async (req, res) => {
@@ -92,6 +141,12 @@ router.put("/", async (req, res) => {
 
   res.json({ success: true });
 });
+router.delete("/all/:type", async (req, res) => {
+  const { type } = req.params; // positive / negative
+  await Keyword.deleteMany({ type });
+  res.json({ success: true });
+});
+
 router.delete("/all", async (req, res) => {
   try {
     await Keyword.deleteMany({});

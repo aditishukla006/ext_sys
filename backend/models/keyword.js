@@ -1,16 +1,12 @@
 const mongoose = require("mongoose");
 
-const KeywordSchema = new mongoose.Schema({
-  keyword: {
+const keywordSchema = new mongoose.Schema({
+  keyword: { type: String, required: true, unique: true },
+  type: {
     type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+    enum: ["positive", "negative"],
+    default: "positive"
   }
-});
+}, { timestamps: true });
 
-module.exports = mongoose.model("Keyword", KeywordSchema);
+module.exports = mongoose.model("Keyword", keywordSchema);
