@@ -1,4 +1,4 @@
-const API = "http://localhost:5050/api/keywords";
+const API = "https://ext-sys.onrender.com/api/keywords";
 let editing = null;
 
 // SECTION SWITCH

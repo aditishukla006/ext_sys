@@ -1,11 +1,15 @@
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
 
 const app = express();
 
-app.use(cors());
+const cors = require("cors");
+app.use(cors({
+  origin: "https://ext-sys.vercel.app", // no trailing slash!
+  methods: ["GET","POST","PUT","DELETE","OPTIONS"],
+}));
+
 app.use(express.json());
 
 mongoose

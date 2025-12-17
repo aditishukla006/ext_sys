@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:5050/api/keywords";
+const API_URL = "https://ext-sys.onrender.com/api/keywords";
 
 let positiveKeywords = [];
 
