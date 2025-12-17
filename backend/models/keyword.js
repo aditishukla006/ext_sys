@@ -7,6 +7,8 @@ const keywordSchema = new mongoose.Schema(
       required: true,
       unique: true, // prevent duplicates
       trim: true,
+            lowercase: true, // ensures all keywords are stored in lowercase
+
     },
     createdAt: {
       type: Date,
