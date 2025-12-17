@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Keyword Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="container">
+  <h2>Keyword Management</h2>
+  <p class="subtitle">Manage keywords used by extension</p>
+
+  <!-- DASHBOARD BUTTONS -->
+  <div class="dashboard">
+    <button onclick="showSection('add')">➕ Add Keyword</button>
+    <button onclick="showSection('list')">📋 Keyword List</button>
+    <button onclick="showSection('search')">🔍 Find Keyword</button>
+    <button class="danger" onclick="deleteAll()">🗑 Delete All</button>
+  </div>
+
+  <!-- ADD / UPDATE -->
+  <div id="add" class="section hidden">
+    <h3>Add / Update Keyword</h3>
+    <input id="keywordInput" placeholder="Enter keyword" />
+    <button onclick="addOrUpdate()">Save</button>
+  </div>
+
+  <!-- LIST -->
+  <div id="list" class="section hidden">
+    <h3>All Keywords</h3>
+    <ul id="keywordList"></ul>
+  </div>
+
+  <!-- SEARCH -->
+  <div id="search" class="section hidden">
+    <h3>Find Keyword</h3>
+    <input id="searchInput" placeholder="Search..." oninput="searchKeyword()" />
+    <ul id="searchList"></ul>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
