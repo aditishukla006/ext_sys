@@ -21,14 +21,36 @@ const keywordSchema = new mongoose.Schema(
 module.exports = mongoose.model("Keyword", keywordSchema);*/
 const mongoose = require("mongoose");
 
-const keywordSchema = new mongoose.Schema({
-  keyword: { type: String, required: true, trim: true },
-  type: {
-    type: String,
-    enum: ["positive", "negative"],
-    default: "positive"
-  }
-}, { timestamps: true });
+const keywordSchema = new mongoose.Schema(
+  {
+    clientKey: {
+      type: String,
+      required: true,
+      index: true, // fast lookup per client
+    },
+
+    keyword: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+    },
+
+    type: {
+      type: String,
+      enum: ["positive", "negative"],
+      default: "positive",
+    },
+  },
+  { timestamps: true }
+);
+
+// 🔒 Prevent duplicate keyword per client + type
+keywordSchema.index(
+  { clientKey: 1, keyword: 1, type: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("Keyword", keywordSchema);
+
 

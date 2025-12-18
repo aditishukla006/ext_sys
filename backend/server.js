@@ -25,8 +25,6 @@ app.use(cors({
   methods: ["GET","POST","PUT","DELETE","OPTIONS"]
 }));
 
-
-
 app.use(express.json());
 
 mongoose
@@ -35,6 +33,8 @@ mongoose
   .catch(err => console.error("❌ Mongo Error", err));
 
 app.use("/api/keywords", require("./routes/keywords"));
+app.use("/api/clients", require("./routes/clients"));
+
 
 app.listen(5050, () =>
   console.log("🚀 Backend running on port 5050")

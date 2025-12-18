@@ -112,19 +112,25 @@ router.delete("/:keyword", async (req, res) => {
 module.exports = router;*/
 const router = require("express").Router();
 const Keyword = require("../models/keyword");
+const verifyClient = require("../middleware/verifyClient");
+
+router.use(verifyClient);
 
 /**
  * GET → fetch all keywords
  */
 router.get("/", async (req, res) => {
   try {
-    const data = await Keyword.find().sort({ createdAt: -1 });
-    res.json(data); // returns [{keyword, type, createdAt, ...}, ...]
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Client key required" });
+
+    const data = await Keyword.find({ clientKey }).sort({ createdAt: -1 });
+    res.json(data);
   } catch (err) {
-    console.error("Fetch error:", err);
-    res.status(500).json({ error: "Failed to fetch keywords" });
+    res.status(500).json({ error: "Fetch failed" });
   }
 });
+
 
 /**
  * GET → search keywords
@@ -132,19 +138,22 @@ router.get("/", async (req, res) => {
  */
 router.get("/search", async (req, res) => {
   try {
+    const clientKey = req.headers["x-client-key"];
     const q = req.query.q;
-    if (!q || !q.trim()) return res.json([]);
+
+    if (!clientKey || !q) return res.json([]);
 
     const results = await Keyword.find({
-      keyword: { $regex: q.toLowerCase().trim(), $options: "i" }
-    }).sort({ createdAt: -1 });
+      clientKey,
+      keyword: { $regex: q.toLowerCase(), $options: "i" }
+    });
 
     res.json(results);
   } catch (err) {
-    console.error("Search error:", err);
     res.status(500).json({ error: "Search failed" });
   }
 });
+
 
 /**
  * POST → add single or multiple keywords with type
@@ -152,57 +161,56 @@ router.get("/search", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   try {
-    let keywords = [];
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Client key required" });
+
     const type = req.body.type === "negative" ? "negative" : "positive";
+    let list = [];
 
-    if (Array.isArray(req.body.keywords)) {
-      keywords = req.body.keywords;
-    } else if (req.body.keyword) {
-      keywords = [req.body.keyword];
-    } else {
-      return res.status(400).json({ error: "Keyword(s) required" });
-    }
+    if (Array.isArray(req.body.keywords)) list = req.body.keywords;
+    else if (req.body.keyword) list = [req.body.keyword];
+    else return res.status(400).json({ error: "Keyword required" });
 
-    // clean + lowercase + unique
-    keywords = [...new Set(keywords.map(k => k.toLowerCase().trim()).filter(Boolean))];
+    list = [...new Set(list.map(k => k.toLowerCase().trim()).filter(Boolean))];
 
-    // check existing
-    const existing = await Keyword.find({ keyword: { $in: keywords } });
+    const existing = await Keyword.find({ clientKey, keyword: { $in: list } });
     const existingSet = new Set(existing.map(e => e.keyword));
 
-    const newKeywords = keywords
+    const newItems = list
       .filter(k => !existingSet.has(k))
-      .map(k => ({ keyword: k, type }));
+      .map(k => ({ keyword: k, type, clientKey }));
 
-    if (newKeywords.length > 0) {
-      await Keyword.insertMany(newKeywords);
-    }
+    if (newItems.length) await Keyword.insertMany(newItems);
 
     res.json({
       success: true,
-      added: newKeywords.map(k => k.keyword),
+      added: newItems.map(k => k.keyword),
       skipped: [...existingSet]
     });
   } catch (err) {
-    console.error("POST error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /**
  * PUT → update keyword
  * body: { oldKeyword: "a", newKeyword: "b", type: "negative" }
  */
 router.put("/", async (req, res) => {
+  const clientKey = req.headers["x-client-key"];
   const { oldKeyword, newKeyword, type } = req.body;
 
-  if (!oldKeyword || !newKeyword) {
-    return res.status(400).json({ error: "Both oldKeyword and newKeyword required" });
+  if (!clientKey || !oldKeyword || !newKeyword) {
+    return res.status(400).json({ error: "Missing fields" });
   }
 
   const updated = await Keyword.findOneAndUpdate(
-    { keyword: oldKeyword.toLowerCase().trim() },
-    { keyword: newKeyword.toLowerCase().trim(), type: type === "negative" ? "negative" : "positive" },
+    { clientKey, keyword: oldKeyword.toLowerCase() },
+    {
+      keyword: newKeyword.toLowerCase(),
+      type: type === "negative" ? "negative" : "positive"
+    },
     { new: true }
   );
 
@@ -211,30 +219,33 @@ router.put("/", async (req, res) => {
   res.json({ success: true, updated });
 });
 
+
 /**
  * DELETE all keywords
  */
 router.delete("/all", async (req, res) => {
-  try {
-    await Keyword.deleteMany({});
-    res.json({ success: true, message: "All keywords deleted successfully" });
-  } catch (err) {
-    console.error("Error deleting all keywords:", err);
-    res.status(500).json({ error: "Failed to delete all keywords" });
-  }
+  const clientKey = req.headers["x-client-key"];
+  if (!clientKey) return res.status(401).json({ error: "Client key required" });
+
+  await Keyword.deleteMany({ clientKey });
+  res.json({ success: true });
 });
+
 
 /**
  * DELETE single keyword by keyword value
  */
 router.delete("/:keyword", async (req, res) => {
-  try {
-    await Keyword.deleteOne({ keyword: req.params.keyword.toLowerCase().trim() });
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Delete error:", err);
-    res.status(500).json({ error: "Failed to delete keyword" });
-  }
+  const clientKey = req.headers["x-client-key"];
+  if (!clientKey) return res.status(401).json({ error: "Client key required" });
+
+  await Keyword.deleteOne({
+    clientKey,
+    keyword: req.params.keyword.toLowerCase()
+  });
+
+  res.json({ success: true });
 });
+
 
 module.exports = router;
