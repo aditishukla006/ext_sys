@@ -1,9 +1,9 @@
-const router = require("express").Router();
+/*const router = require("express").Router();
 const Keyword = require("../models/keyword");
 
 /**
  * GET → fetch all keywords
- */
+ 
 router.get("/search", async (req, res) => {
   try {
     const q = req.query.q;
@@ -31,7 +31,7 @@ router.get("/", async (req, res) => {
 /**
  * POST → add single OR multiple keywords
  * body: { keywords: ["a", "b"] } OR { keyword: "a" }
- */
+ 
 router.post("/", async (req, res) => {
   console.log("REQ.BODY:", req.body);
   try {
@@ -103,10 +103,138 @@ router.delete("/all", async (req, res) => {
 });
 /**
  * DELETE
- */
+ 
 router.delete("/:keyword", async (req, res) => {
   await Keyword.deleteOne({ keyword: req.params.keyword });
   res.json({ success: true });
+});
+
+module.exports = router;*/
+const router = require("express").Router();
+const Keyword = require("../models/keyword");
+
+/**
+ * GET → fetch all keywords
+ */
+router.get("/", async (req, res) => {
+  try {
+    const data = await Keyword.find().sort({ createdAt: -1 });
+    res.json(data); // returns [{keyword, type, createdAt, ...}, ...]
+  } catch (err) {
+    console.error("Fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch keywords" });
+  }
+});
+
+/**
+ * GET → search keywords
+ * query param: q
+ */
+router.get("/search", async (req, res) => {
+  try {
+    const q = req.query.q;
+    if (!q || !q.trim()) return res.json([]);
+
+    const results = await Keyword.find({
+      keyword: { $regex: q.toLowerCase().trim(), $options: "i" }
+    }).sort({ createdAt: -1 });
+
+    res.json(results);
+  } catch (err) {
+    console.error("Search error:", err);
+    res.status(500).json({ error: "Search failed" });
+  }
+});
+
+/**
+ * POST → add single or multiple keywords with type
+ * body: { keywords: ["a","b"], type: "positive" } OR { keyword: "a", type: "negative" }
+ */
+router.post("/", async (req, res) => {
+  try {
+    let keywords = [];
+    const type = req.body.type === "negative" ? "negative" : "positive";
+
+    if (Array.isArray(req.body.keywords)) {
+      keywords = req.body.keywords;
+    } else if (req.body.keyword) {
+      keywords = [req.body.keyword];
+    } else {
+      return res.status(400).json({ error: "Keyword(s) required" });
+    }
+
+    // clean + lowercase + unique
+    keywords = [...new Set(keywords.map(k => k.toLowerCase().trim()).filter(Boolean))];
+
+    // check existing
+    const existing = await Keyword.find({ keyword: { $in: keywords } });
+    const existingSet = new Set(existing.map(e => e.keyword));
+
+    const newKeywords = keywords
+      .filter(k => !existingSet.has(k))
+      .map(k => ({ keyword: k, type }));
+
+    if (newKeywords.length > 0) {
+      await Keyword.insertMany(newKeywords);
+    }
+
+    res.json({
+      success: true,
+      added: newKeywords.map(k => k.keyword),
+      skipped: [...existingSet]
+    });
+  } catch (err) {
+    console.error("POST error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * PUT → update keyword
+ * body: { oldKeyword: "a", newKeyword: "b", type: "negative" }
+ */
+router.put("/", async (req, res) => {
+  const { oldKeyword, newKeyword, type } = req.body;
+
+  if (!oldKeyword || !newKeyword) {
+    return res.status(400).json({ error: "Both oldKeyword and newKeyword required" });
+  }
+
+  const updated = await Keyword.findOneAndUpdate(
+    { keyword: oldKeyword.toLowerCase().trim() },
+    { keyword: newKeyword.toLowerCase().trim(), type: type === "negative" ? "negative" : "positive" },
+    { new: true }
+  );
+
+  if (!updated) return res.status(404).json({ error: "Keyword not found" });
+
+  res.json({ success: true, updated });
+});
+
+/**
+ * DELETE all keywords
+ */
+router.delete("/all", async (req, res) => {
+  try {
+    await Keyword.deleteMany({});
+    res.json({ success: true, message: "All keywords deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting all keywords:", err);
+    res.status(500).json({ error: "Failed to delete all keywords" });
+  }
+});
+
+/**
+ * DELETE single keyword by keyword value
+ */
+router.delete("/:keyword", async (req, res) => {
+  try {
+    await Keyword.deleteOne({ keyword: req.params.keyword.toLowerCase().trim() });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete error:", err);
+    res.status(500).json({ error: "Failed to delete keyword" });
+  }
 });
 
 module.exports = router;
