@@ -180,7 +180,11 @@ router.post("/", async (req, res) => {
       .filter(k => !existingSet.has(k))
       .map(k => ({ keyword: k, type, clientKey }));
 
-    if (newItems.length) await Keyword.insertMany(newItems);
+    if (newItems.length) {
+      // Log what we are inserting
+      console.log("Inserting keywords:", newItems);
+      await Keyword.insertMany(newItems);
+    }
 
     res.json({
       success: true,
@@ -188,9 +192,13 @@ router.post("/", async (req, res) => {
       skipped: [...existingSet]
     });
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    // Log full error details
+    console.error("Keyword insert error:", err);
+    console.error("Request body:", req.body);
+    res.status(500).json({ error: "Server error", message: err.message });
   }
 });
+
 
 
 /**
