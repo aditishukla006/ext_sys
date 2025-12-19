@@ -8,26 +8,40 @@ const generateKey = require("../utils/generateKey");
  * POST /api/clients
  * body: { name: "Client Name" }
  */
+router.get("/by-name/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+    if (!name) return res.status(400).json({ error: "Client name required" });
+
+    const client = await Client.findOne({ name: name.trim().toLowerCase() });
+    if (!client) return res.json({ exists: false });
+
+    res.json({ exists: true, clientKey: client.clientKey });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 router.post("/", async (req, res) => {
   try {
     const { name } = req.body;
-    if (!name) return res.status(400).json({ error: "Name required" });
+    if (!name) return res.status(400).json({ error: "Client name required" });
 
-    const clientKey = generateKey();
+    // check if client already exists
+    let client = await Client.findOne({ name: name.trim().toLowerCase() });
+    if (!client) {
+      // generate clientKey
+      const crypto = require("crypto");
+      const clientKey = crypto.randomBytes(32).toString("hex");
 
-    const client = await Client.create({
-      name,
-      clientKey
-    });
+      client = await Client.create({ name: name.trim().toLowerCase(), clientKey });
+    }
 
-    res.json({
-      success: true,
-      clientKey: client.clientKey
-    });
+    res.json({ success: true, clientKey: client.clientKey });
   } catch (err) {
-    res.status(500).json({ error: "Client create failed" });
+    res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /**
  * VERIFY CLIENT KEY
