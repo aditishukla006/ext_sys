@@ -55,22 +55,22 @@ router.get("/verify", async (req, res) => {
 
   res.json({ success: true });
 });
-router.put("/blocked-states", async (req, res) => {
+
+router.put("/location-rules", async (req, res) => {
   try {
     const clientKey = req.headers["x-client-key"];
-    const { states } = req.body;
+    const { blockedStates = [], blockedCities = [] } = req.body;
 
-    if (!clientKey) return res.status(401).json({ error: "Client key required" });
-    if (!Array.isArray(states))
-      return res.status(400).json({ error: "States must be array" });
-
-    const cleanedStates = states.map(s =>
-      s.toLowerCase().trim()
-    );
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
 
     const client = await Client.findOneAndUpdate(
       { clientKey },
-      { blockedStates: cleanedStates },
+      {
+        locationRules: {
+          blockedStates: blockedStates.map(s => s.toLowerCase().trim()),
+          blockedCities: blockedCities.map(c => c.toLowerCase().trim())
+        }
+      },
       { new: true }
     );
 
@@ -78,23 +78,19 @@ router.put("/blocked-states", async (req, res) => {
 
     res.json({
       success: true,
-      blockedStates: client.blockedStates
+      locationRules: client.locationRules
     });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 });
-
-router.get("/blocked-states", async (req, res) => {
+router.get("/location-rules", async (req, res) => {
   const clientKey = req.headers["x-client-key"];
   if (!clientKey) return res.status(401).json({ error: "Key required" });
 
   const client = await Client.findOne({ clientKey });
   if (!client) return res.status(404).json({ error: "Client not found" });
 
-  res.json({ blockedStates: client.blockedStates || [] });
+  res.json(client.locationRules);
 });
-
-
-
 module.exports = router;

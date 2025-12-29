@@ -1,11 +1,14 @@
-// models/client.js
 const mongoose = require("mongoose");
 
 const clientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     clientKey: { type: String, required: true, unique: true },
-        blockedStates: { type: [String], default: [] },
+
+    locationRules: {
+      blockedStates: { type: [String], default: [] }, // ["tamil nadu"]
+      blockedCities: { type: [String], default: [] }  // ["chennai", "surat"]
+    },
 
     active: { type: Boolean, default: true }
   },
