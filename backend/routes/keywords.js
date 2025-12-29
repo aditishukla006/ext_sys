@@ -153,8 +153,6 @@ router.get("/search", async (req, res) => {
     res.status(500).json({ error: "Search failed" });
   }
 });
-
-
 /**
  * POST → add single or multiple keywords with type
  * body: { keywords: ["a","b"], type: "positive" } OR { keyword: "a", type: "negative" }

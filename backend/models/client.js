@@ -5,6 +5,8 @@ const clientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     clientKey: { type: String, required: true, unique: true },
+        blockedStates: { type: [String], default: [] },
+
     active: { type: Boolean, default: true }
   },
   { timestamps: true }
