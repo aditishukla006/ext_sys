@@ -93,4 +93,104 @@ router.get("/location-rules", async (req, res) => {
 
   res.json(client.locationRules);
 });
+// GET /api/clients/daily-leads
+router.get("/daily-leads", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    res.json({
+      dailyLeadLimit: client.dailyLeadLimit,
+      leadsTakenToday: client.leadsTakenToday,
+      lastLeadDate: client.lastLeadDate
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+// PUT /api/clients/daily-leads
+router.put("/daily-leads", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    const { dailyLeadLimit } = req.body;
+
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+    if (dailyLeadLimit !== null && dailyLeadLimit < 1)
+      return res.status(400).json({ error: "Invalid limit" });
+
+    const client = await Client.findOneAndUpdate(
+      { clientKey },
+      { dailyLeadLimit: dailyLeadLimit || null },
+      { new: true }
+    );
+
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    res.json({
+      success: true,
+      dailyLeadLimit: client.dailyLeadLimit
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+// POST /api/clients/increment-lead
+router.post("/increment-lead", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // Reset counter if day changed
+    let leadsTakenToday = client.leadsTakenToday || 0;
+    let lastLeadDate = client.lastLeadDate ? client.lastLeadDate.toISOString().split("T")[0] : null;
+
+    if (lastLeadDate !== today) {
+      leadsTakenToday = 0;
+      lastLeadDate = today;
+    }
+
+    if (client.dailyLeadLimit && leadsTakenToday >= client.dailyLeadLimit) {
+      return res.status(403).json({ error: "Daily lead limit reached" });
+    }
+
+    leadsTakenToday += 1;
+
+    await Client.updateOne(
+      { clientKey },
+      { leadsTakenToday, lastLeadDate: new Date(today) }
+    );
+
+    res.json({ success: true, leadsTakenToday });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+// DELETE /api/clients/daily-leads
+router.delete("/daily-leads", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    client.dailyLeadLimit = null;
+    client.leadsTakenToday = 0;
+    client.lastLeadDate = null;
+
+    await client.save();
+
+    res.json({ success: true, message: "Daily lead info cleared" });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 module.exports = router;

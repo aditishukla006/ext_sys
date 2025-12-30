@@ -9,7 +9,9 @@ const clientSchema = new mongoose.Schema(
       blockedStates: { type: [String], default: [] }, // ["tamil nadu"]
       blockedCities: { type: [String], default: [] }  // ["chennai", "surat"]
     },
-
+   dailyLeadLimit: { type: Number, default: null },       // Max leads per day
+    leadsTakenToday: { type: Number, default: 0 },         // Counter for today
+    lastLeadDate: { type: Date, default: null },  
     active: { type: Boolean, default: true }
   },
   { timestamps: true }
