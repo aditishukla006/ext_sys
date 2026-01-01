@@ -59,28 +59,52 @@ router.get("/verify", async (req, res) => {
 router.put("/location-rules", async (req, res) => {
   try {
     const clientKey = req.headers["x-client-key"];
-    const { blockedStates = [], blockedCities = [] } = req.body;
+    if (!clientKey) {
+      return res.status(401).json({ error: "Key required" });
+    }
 
-    if (!clientKey) return res.status(401).json({ error: "Key required" });
+    const { blockedStates, blockedCities } = req.body;
 
-    const client = await Client.findOneAndUpdate(
+    const client = await Client.findOne({ clientKey });
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+
+    const update = {};
+
+    // ✅ update only if array provided AND not empty
+    if (Array.isArray(blockedStates) && blockedStates.length > 0) {
+      update["locationRules.blockedStates"] =
+        blockedStates.map(s => s.toLowerCase().trim());
+    }
+
+    if (Array.isArray(blockedCities) && blockedCities.length > 0) {
+      update["locationRules.blockedCities"] =
+        blockedCities.map(c => c.toLowerCase().trim());
+    }
+
+    // ❌ nothing to update
+    if (Object.keys(update).length === 0) {
+      return res.json({
+        success: true,
+        locationRules: client.locationRules
+      });
+    }
+
+    await Client.updateOne(
       { clientKey },
-      {
-        locationRules: {
-          blockedStates: blockedStates.map(s => s.toLowerCase().trim()),
-          blockedCities: blockedCities.map(c => c.toLowerCase().trim())
-        }
-      },
-      { new: true }
+      { $set: update }
     );
 
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    const updatedClient = await Client.findOne({ clientKey });
 
     res.json({
       success: true,
-      locationRules: client.locationRules
+      locationRules: updatedClient.locationRules
     });
+
   } catch (err) {
+    console.error("Location rules error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -91,8 +115,12 @@ router.get("/location-rules", async (req, res) => {
   const client = await Client.findOne({ clientKey });
   if (!client) return res.status(404).json({ error: "Client not found" });
 
-  res.json(client.locationRules);
+  res.json({
+    blockedStates: client.locationRules?.blockedStates || [],
+    blockedCities: client.locationRules?.blockedCities || []
+  });
 });
+
 // GET /api/clients/daily-leads
 router.get("/daily-leads", async (req, res) => {
   try {
