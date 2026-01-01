@@ -1,19 +1,19 @@
 // routes/clients.js
 const router = require("express").Router();
 const Client = require("../models/client");
-const generateKey = require("../utils/generateKey");
+const crypto = require("crypto");
 
-/**
- * CREATE CLIENT + API KEY
- * POST /api/clients
- * body: { name: "Client Name" }
- */
+/* ===============================
+   CREATE / GET CLIENT
+================================ */
+
+// GET client by name
 router.get("/by-name/:name", async (req, res) => {
   try {
-    const { name } = req.params;
+    const name = req.params.name?.trim().toLowerCase();
     if (!name) return res.status(400).json({ error: "Client name required" });
 
-    const client = await Client.findOne({ name: name.trim().toLowerCase() });
+    const client = await Client.findOne({ name });
     if (!client) return res.json({ exists: false });
 
     res.json({ exists: true, clientKey: client.clientKey });
@@ -21,19 +21,24 @@ router.get("/by-name/:name", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// CREATE client
 router.post("/", async (req, res) => {
   try {
-    const { name } = req.body;
+    const name = req.body.name?.trim().toLowerCase();
     if (!name) return res.status(400).json({ error: "Client name required" });
 
-    // check if client already exists
-    let client = await Client.findOne({ name: name.trim().toLowerCase() });
+    let client = await Client.findOne({ name });
+
     if (!client) {
-      // generate clientKey
-      const crypto = require("crypto");
       const clientKey = crypto.randomBytes(32).toString("hex");
 
-      client = await Client.create({ name: name.trim().toLowerCase(), clientKey });
+      client = await Client.create({
+        name,
+        clientKey,
+        locationRules: { blockedStates: [], blockedCities: [] },
+        active: true
+      });
     }
 
     res.json({ success: true, clientKey: client.clientKey });
@@ -42,10 +47,9 @@ router.post("/", async (req, res) => {
   }
 });
 
-
-/**
- * VERIFY CLIENT KEY
- */
+/* ===============================
+   VERIFY CLIENT KEY
+================================ */
 router.get("/verify", async (req, res) => {
   const clientKey = req.headers["x-client-key"];
   if (!clientKey) return res.status(401).json({ error: "Key required" });
@@ -56,58 +60,11 @@ router.get("/verify", async (req, res) => {
   res.json({ success: true });
 });
 
-router.put("/location-rules", async (req, res) => {
-  try {
-    const clientKey = req.headers["x-client-key"];
-    if (!clientKey) {
-      return res.status(401).json({ error: "Key required" });
-    }
+/* ===============================
+   LOCATION RULES (IMPORTANT FIX)
+================================ */
 
-    const { blockedStates, blockedCities } = req.body;
-
-    const client = await Client.findOne({ clientKey });
-    if (!client) {
-      return res.status(404).json({ error: "Client not found" });
-    }
-
-    const update = {};
-
-    // ✅ update only if array provided AND not empty
-    if (Array.isArray(blockedStates) && blockedStates.length > 0) {
-      update["locationRules.blockedStates"] =
-        blockedStates.map(s => s.toLowerCase().trim());
-    }
-
-    if (Array.isArray(blockedCities) && blockedCities.length > 0) {
-      update["locationRules.blockedCities"] =
-        blockedCities.map(c => c.toLowerCase().trim());
-    }
-
-    // ❌ nothing to update
-    if (Object.keys(update).length === 0) {
-      return res.json({
-        success: true,
-        locationRules: client.locationRules
-      });
-    }
-
-    await Client.updateOne(
-      { clientKey },
-      { $set: update }
-    );
-
-    const updatedClient = await Client.findOne({ clientKey });
-
-    res.json({
-      success: true,
-      locationRules: updatedClient.locationRules
-    });
-
-  } catch (err) {
-    console.error("Location rules error:", err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+// GET location rules
 router.get("/location-rules", async (req, res) => {
   const clientKey = req.headers["x-client-key"];
   if (!clientKey) return res.status(401).json({ error: "Key required" });
@@ -121,8 +78,8 @@ router.get("/location-rules", async (req, res) => {
   });
 });
 
-// GET /api/clients/daily-leads
-router.get("/daily-leads", async (req, res) => {
+// UPDATE location rules (NO AUTO REMOVE)
+router.put("/location-rules", async (req, res) => {
   try {
     const clientKey = req.headers["x-client-key"];
     if (!clientKey) return res.status(401).json({ error: "Key required" });
@@ -130,95 +87,122 @@ router.get("/daily-leads", async (req, res) => {
     const client = await Client.findOne({ clientKey });
     if (!client) return res.status(404).json({ error: "Client not found" });
 
-    res.json({
-      dailyLeadLimit: client.dailyLeadLimit,
-      leadsTakenToday: client.leadsTakenToday,
-      lastLeadDate: client.lastLeadDate
-    });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-// PUT /api/clients/daily-leads
-router.put("/daily-leads", async (req, res) => {
-  try {
-    const clientKey = req.headers["x-client-key"];
-    const { dailyLeadLimit } = req.body;
+    const update = {};
 
-    if (!clientKey) return res.status(401).json({ error: "Key required" });
-    if (dailyLeadLimit !== null && dailyLeadLimit < 1)
-      return res.status(400).json({ error: "Invalid limit" });
+    if (Array.isArray(req.body.blockedStates)) {
+      update["locationRules.blockedStates"] =
+        req.body.blockedStates.map(s => s.toLowerCase().trim());
+    }
 
-    const client = await Client.findOneAndUpdate(
-      { clientKey },
-      { dailyLeadLimit: dailyLeadLimit || null },
-      { new: true }
-    );
+    if (Array.isArray(req.body.blockedCities)) {
+      update["locationRules.blockedCities"] =
+        req.body.blockedCities.map(c => c.toLowerCase().trim());
+    }
 
-    if (!client) return res.status(404).json({ error: "Client not found" });
+    // nothing to update
+    if (Object.keys(update).length === 0) {
+      return res.json({
+        success: true,
+        locationRules: client.locationRules
+      });
+    }
+
+    await Client.updateOne({ clientKey }, { $set: update });
+
+    const updated = await Client.findOne({ clientKey });
 
     res.json({
       success: true,
-      dailyLeadLimit: client.dailyLeadLimit
+      locationRules: updated.locationRules
     });
   } catch (err) {
+    console.error("Location rule error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
-// POST /api/clients/increment-lead
+
+/* ===============================
+   DAILY LEAD LIMIT
+================================ */
+
+// GET daily lead info
+router.get("/daily-leads", async (req, res) => {
+  const clientKey = req.headers["x-client-key"];
+  if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+  const client = await Client.findOne({ clientKey });
+  if (!client) return res.status(404).json({ error: "Client not found" });
+
+  res.json({
+    dailyLeadLimit: client.dailyLeadLimit,
+    leadsTakenToday: client.leadsTakenToday,
+    lastLeadDate: client.lastLeadDate
+  });
+});
+
+// SET daily lead limit
+router.put("/daily-leads", async (req, res) => {
+  const clientKey = req.headers["x-client-key"];
+  const { dailyLeadLimit } = req.body;
+
+  if (!clientKey) return res.status(401).json({ error: "Key required" });
+  if (dailyLeadLimit !== null && dailyLeadLimit < 1)
+    return res.status(400).json({ error: "Invalid limit" });
+
+  const client = await Client.findOneAndUpdate(
+    { clientKey },
+    { dailyLeadLimit: dailyLeadLimit ?? null },
+    { new: true }
+  );
+
+  if (!client) return res.status(404).json({ error: "Client not found" });
+
+  res.json({ success: true, dailyLeadLimit: client.dailyLeadLimit });
+});
+
+// INCREMENT lead
 router.post("/increment-lead", async (req, res) => {
-  try {
-    const clientKey = req.headers["x-client-key"];
-    if (!clientKey) return res.status(401).json({ error: "Key required" });
+  const clientKey = req.headers["x-client-key"];
+  if (!clientKey) return res.status(401).json({ error: "Key required" });
 
-    const client = await Client.findOne({ clientKey });
-    if (!client) return res.status(404).json({ error: "Client not found" });
+  const client = await Client.findOne({ clientKey });
+  if (!client) return res.status(404).json({ error: "Client not found" });
 
-    const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+  const last = client.lastLeadDate
+    ? client.lastLeadDate.toISOString().split("T")[0]
+    : null;
 
-    // Reset counter if day changed
-    let leadsTakenToday = client.leadsTakenToday || 0;
-    let lastLeadDate = client.lastLeadDate ? client.lastLeadDate.toISOString().split("T")[0] : null;
+  let taken = last === today ? client.leadsTakenToday || 0 : 0;
 
-    if (lastLeadDate !== today) {
-      leadsTakenToday = 0;
-      lastLeadDate = today;
-    }
-
-    if (client.dailyLeadLimit && leadsTakenToday >= client.dailyLeadLimit) {
-      return res.status(403).json({ error: "Daily lead limit reached" });
-    }
-
-    leadsTakenToday += 1;
-
-    await Client.updateOne(
-      { clientKey },
-      { leadsTakenToday, lastLeadDate: new Date(today) }
-    );
-
-    res.json({ success: true, leadsTakenToday });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
+  if (client.dailyLeadLimit && taken >= client.dailyLeadLimit) {
+    return res.status(403).json({ error: "Daily lead limit reached" });
   }
+
+  taken++;
+
+  await Client.updateOne(
+    { clientKey },
+    { leadsTakenToday: taken, lastLeadDate: new Date(today) }
+  );
+
+  res.json({ success: true, leadsTakenToday: taken });
 });
-// DELETE /api/clients/daily-leads
+
+// RESET daily leads
 router.delete("/daily-leads", async (req, res) => {
-  try {
-    const clientKey = req.headers["x-client-key"];
-    if (!clientKey) return res.status(401).json({ error: "Key required" });
+  const clientKey = req.headers["x-client-key"];
+  if (!clientKey) return res.status(401).json({ error: "Key required" });
 
-    const client = await Client.findOne({ clientKey });
-    if (!client) return res.status(404).json({ error: "Client not found" });
+  const client = await Client.findOne({ clientKey });
+  if (!client) return res.status(404).json({ error: "Client not found" });
 
-    client.dailyLeadLimit = null;
-    client.leadsTakenToday = 0;
-    client.lastLeadDate = null;
+  client.dailyLeadLimit = null;
+  client.leadsTakenToday = 0;
+  client.lastLeadDate = null;
+  await client.save();
 
-    await client.save();
-
-    res.json({ success: true, message: "Daily lead info cleared" });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({ success: true, message: "Daily lead info cleared" });
 });
+
 module.exports = router;
