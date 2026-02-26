@@ -2,50 +2,59 @@
 const router = require("express").Router();
 const Client = require("../models/client");
 const crypto = require("crypto");
-
+const bcrypt = require("bcrypt");
 /* ===============================
    CREATE / GET CLIENT
 ================================ */
 
-// GET client by name
-router.get("/by-name/:name", async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const name = req.params.name?.trim().toLowerCase();
-    if (!name) return res.status(400).json({ error: "Client name required" });
+    const { email, password } = req.body;
 
-    const client = await Client.findOne({ name });
-    if (!client) return res.json({ exists: false });
+    if (!email || !password)
+      return res.status(400).json({ error: "Email & Password required" });
 
-    res.json({ exists: true, clientKey: client.clientKey });
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// CREATE client
-router.post("/", async (req, res) => {
-  try {
-    const name = req.body.name?.trim().toLowerCase();
-    if (!name) return res.status(400).json({ error: "Client name required" });
-
-    let client = await Client.findOne({ name });
+    const emailTrim = email.toLowerCase().trim();
+    let client = await Client.findOne({ email: emailTrim });
 
     if (!client) {
+      // User doesn't exist → create automatically
       const clientKey = crypto.randomBytes(32).toString("hex");
 
+      const hashedPassword = await bcrypt.hash(password, 10);
+
       client = await Client.create({
-        name,
+        email: emailTrim,
+        password: hashedPassword,
         clientKey,
         locationRules: { blockedStates: [], blockedCities: [] },
         active: true
       });
+
+      return res.json({
+        success: true,
+        message: "New client created",
+        clientKey: client.clientKey
+      });
     }
 
-    res.json({ success: true, clientKey: client.clientKey });
+    // User exists → verify password
+    const isMatch = await bcrypt.compare(password, client.password);
+    if (!isMatch) return res.status(400).json({ error: "Invalid password" });
+    if (!client.active) return res.status(403).json({ error: "Account disabled" });
+
+    res.json({
+      success: true,
+      message: "Login successful",
+      clientKey: client.clientKey
+    });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /* ===============================
    VERIFY CLIENT KEY

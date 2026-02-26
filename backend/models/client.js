@@ -2,8 +2,18 @@ const mongoose = require("mongoose");
 
 const clientSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    clientKey: { type: String, required: true, unique: true },
+   email: { 
+      type: String, 
+      required: true, 
+      unique: true,
+      lowercase: true,
+      trim: true
+    },
+
+    password: { 
+      type: String, 
+      required: true 
+    },    clientKey: { type: String, required: true, unique: true },
 
     locationRules: {
       blockedStates: { type: [String], default: [] }, // ["tamil nadu"]
