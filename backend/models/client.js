@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 
 const clientSchema = new mongoose.Schema(
   {
-   email: { 
+    email: { 
       type: String, 
       required: true, 
       unique: true,
@@ -14,16 +14,28 @@ const clientSchema = new mongoose.Schema(
     password: { 
       type: String, 
       required: true 
-    },    clientKey: { type: String, required: true, unique: true },
+    },
+
+    clientKey: { 
+      type: String, 
+      required: true, 
+      unique: true 
+    },
 
     locationRules: {
-      blockedStates: { type: [String], default: [] }, // ["tamil nadu"]
-      blockedCities: { type: [String], default: [] }  // ["chennai", "surat"]
+      blockedStates: { type: [String], default: [] },
+      blockedCities: { type: [String], default: [] }
     },
-   dailyLeadLimit: { type: Number, default: null },       // Max leads per day
-    leadsTakenToday: { type: Number, default: 0 },         // Counter for today
-    lastLeadDate: { type: Date, default: null },  
-    active: { type: Boolean, default: true }
+
+    dailyLeadLimit: { type: Number, default: null },
+    leadsTakenToday: { type: Number, default: 0 },
+    lastLeadDate: { type: Date, default: null },
+    active: { type: Boolean, default: true },
+
+    // 🔐 Forgot Password Fields
+    resetToken: { type: String },
+    resetTokenExpiry: { type: Date }
+
   },
   { timestamps: true }
 );

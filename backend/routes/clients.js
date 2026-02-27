@@ -55,7 +55,77 @@ router.post("/login", async (req, res) => {
   }
 });
 
+//forgot password
+/* ===============================
+   FORGOT PASSWORD
+================================ */
 
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email)
+      return res.status(400).json({ error: "Email required" });
+
+    const emailTrim = email.toLowerCase().trim();
+    const client = await Client.findOne({ email: emailTrim });
+
+    if (!client)
+      return res.status(400).json({ error: "Email not found" });
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    client.resetToken = resetToken;
+    client.resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await client.save();
+
+    // For now we just return token (later email send karisu)
+    res.json({
+      success: true,
+      message: "Reset token generated",
+      resetToken
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+/* ===============================
+   RESET PASSWORD
+================================ */
+
+router.post("/reset-password/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword)
+      return res.status(400).json({ error: "New password required" });
+
+    const client = await Client.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+
+    if (!client)
+      return res.status(400).json({ error: "Invalid or expired token" });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    client.password = hashedPassword;
+    client.resetToken = undefined;
+    client.resetTokenExpiry = undefined;
+
+    await client.save();
+
+    res.json({ success: true, message: "Password reset successful" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 /* ===============================
    VERIFY CLIENT KEY
 ================================ */
