@@ -82,31 +82,31 @@ router.post("/forgot-password", async (req, res) => {
     // ✅ Reset link (Chrome extension use kari rahya hoy to change karjo)
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
     // ✅ brevo email sending
-const brevo = require('@getbrevo/brevo');
+const axios = require("axios");
 
-const defaultClient = brevo.ApiClient.instance;
-
-const apiKey = defaultClient.authentications['api-key'];
-apiKey.apiKey = process.env.BREVO_API_KEY;
-
-const apiInstance = new brevo.TransactionalEmailsApi();
-
-const sendSmtpEmail = {
-  sender: {
-    email: "grabity820@gmail.com", // verified in Brevo
-    name: "Support Team"
+await axios.post(
+  "https://api.brevo.com/v3/smtp/email",
+  {
+    sender: {
+      email: "grabity820@gmail.com", // verified in Brevo
+      name: "Support Team"
+    },
+    to: [{ email: client.email }],
+    subject: "Password Reset Request",
+    htmlContent: `
+      <h3>Password Reset</h3>
+      <p>Click below link to reset your password:</p>
+      <a href="${resetLink}">${resetLink}</a>
+      <p>This link expires in 15 minutes.</p>
+    `
   },
-  to: [{ email: client.email }],
-  subject: "Password Reset Request",
-  htmlContent: `
-    <h3>Password Reset</h3>
-    <p>Click below link to reset your password:</p>
-    <a href="${resetLink}">${resetLink}</a>
-    <p>This link expires in 15 minutes.</p>
-  `
-};
-
-await apiInstance.sendTransacEmail(sendSmtpEmail);
+  {
+    headers: {
+      "api-key": process.env.BREVO_API_KEY,
+      "Content-Type": "application/json"
+    }
+  }
+);
     res.json({ success: true, message: "Reset link sent to email" });
 
   } catch (err) {
