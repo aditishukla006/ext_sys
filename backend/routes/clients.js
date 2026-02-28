@@ -3,6 +3,8 @@ const router = require("express").Router();
 const Client = require("../models/client");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 /* ===============================
    CREATE / GET CLIENT
 ================================ */
@@ -59,7 +61,6 @@ router.post("/login", async (req, res) => {
 /* ===============================
    FORGOT PASSWORD
 ================================ */
-
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
@@ -76,18 +77,36 @@ router.post("/forgot-password", async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString("hex");
 
     client.resetToken = resetToken;
-    client.resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+    client.resetTokenExpiry = Date.now() + 15 * 60 * 1000;
     await client.save();
 
-    // For now we just return token (later email send karisu)
-    res.json({
-      success: true,
-      message: "Reset token generated",
-      resetToken
+    // ✅ Reset link (Chrome extension use kari rahya hoy to change karjo)
+const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
+    // ✅ Nodemailer setup
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
     });
 
+    await transporter.sendMail({
+      from: `"Support Team" <${process.env.EMAIL_USER}>`,
+      to: client.email,
+      subject: "Password Reset Request",
+      html: `
+        <h3>Password Reset</h3>
+        <p>Click below link to reset your password:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>This link expires in 15 minutes.</p>
+      `
+    });
+
+    res.json({ success: true, message: "Reset link sent to email" });
+
   } catch (err) {
-    console.error(err);
+    console.error("Forgot password error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
