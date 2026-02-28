@@ -83,19 +83,19 @@ router.post("/forgot-password", async (req, res) => {
     // ✅ Reset link (Chrome extension use kari rahya hoy to change karjo)
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
     // ✅ Nodemailer setup
-    const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // 465 mate true jaruri
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: false, // 587 mate false
+  requireTLS: true,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 10000
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
 });
 
     await transporter.sendMail({
-      from: `"Support Team" <${process.env.EMAIL_USER}>`,
+      from: `"Support Team" <${process.env.SMTP_USER}>`,
       to: client.email,
       subject: "Password Reset Request",
       html: `
