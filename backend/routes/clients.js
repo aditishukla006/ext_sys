@@ -3,7 +3,6 @@ const router = require("express").Router();
 const Client = require("../models/client");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
 require("dotenv").config();
 /* ===============================
    CREATE / GET CLIENT
@@ -83,28 +82,35 @@ router.post("/forgot-password", async (req, res) => {
     // ✅ Reset link (Chrome extension use kari rahya hoy to change karjo)
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
     // ✅ Nodemailer setup
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false, // 587 mate false
-  requireTLS: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
 
-    await transporter.sendMail({
-      from: `"Support Team" <${process.env.SMTP_USER}>`,
-      to: client.email,
-      subject: "Password Reset Request",
-      html: `
-        <h3>Password Reset</h3>
-        <p>Click below link to reset your password:</p>
-        <a href="${resetLink}">${resetLink}</a>
-        <p>This link expires in 15 minutes.</p>
-      `
-    });
+const brevo = require('@getbrevo/brevo');
+
+const apiInstance = new brevo.TransactionalEmailsApi();
+
+// ✅ Correct way
+apiInstance.setApiKey(
+  brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
+
+const sendSmtpEmail = new brevo.SendSmtpEmail();
+
+sendSmtpEmail.sender = {
+  email: "grabity820@gmail.com", // must be verified in Brevo
+  name: "Support Team"
+};
+
+sendSmtpEmail.to = [{ email: client.email }];
+sendSmtpEmail.subject = "Password Reset Request";
+
+sendSmtpEmail.htmlContent = `
+  <h3>Password Reset</h3>
+  <p>Click below link to reset your password:</p>
+  <a href="${resetLink}">${resetLink}</a>
+  <p>This link expires in 15 minutes.</p>
+`;
+
+await apiInstance.sendTransacEmail(sendSmtpEmail);
 
     res.json({ success: true, message: "Reset link sent to email" });
 
