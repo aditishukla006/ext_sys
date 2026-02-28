@@ -81,37 +81,32 @@ router.post("/forgot-password", async (req, res) => {
 
     // ✅ Reset link (Chrome extension use kari rahya hoy to change karjo)
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
-    // ✅ Nodemailer setup
-
+    // ✅ brevo email sending
 const brevo = require('@getbrevo/brevo');
+
+const defaultClient = brevo.ApiClient.instance;
+
+const apiKey = defaultClient.authentications['api-key'];
+apiKey.apiKey = process.env.BREVO_API_KEY;
 
 const apiInstance = new brevo.TransactionalEmailsApi();
 
-// ✅ Correct way
-apiInstance.setApiKey(
-  brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
-
-const sendSmtpEmail = new brevo.SendSmtpEmail();
-
-sendSmtpEmail.sender = {
-  email: "grabity820@gmail.com", // must be verified in Brevo
-  name: "Support Team"
+const sendSmtpEmail = {
+  sender: {
+    email: "grabity820@gmail.com", // verified in Brevo
+    name: "Support Team"
+  },
+  to: [{ email: client.email }],
+  subject: "Password Reset Request",
+  htmlContent: `
+    <h3>Password Reset</h3>
+    <p>Click below link to reset your password:</p>
+    <a href="${resetLink}">${resetLink}</a>
+    <p>This link expires in 15 minutes.</p>
+  `
 };
 
-sendSmtpEmail.to = [{ email: client.email }];
-sendSmtpEmail.subject = "Password Reset Request";
-
-sendSmtpEmail.htmlContent = `
-  <h3>Password Reset</h3>
-  <p>Click below link to reset your password:</p>
-  <a href="${resetLink}">${resetLink}</a>
-  <p>This link expires in 15 minutes.</p>
-`;
-
 await apiInstance.sendTransacEmail(sendSmtpEmail);
-
     res.json({ success: true, message: "Reset link sent to email" });
 
   } catch (err) {
