@@ -7,7 +7,8 @@ const app = express();
 const cors = require("cors");
 const allowedOrigins = [
   "https://ext-sys.vercel.app",       // frontend
-  "https://seller.indiamart.com"      // content script
+  "https://seller.indiamart.com"  ,
+  "https://dapper-granita-9191da.netlify.app"
 ];
 
 app.use(cors({
