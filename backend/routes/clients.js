@@ -84,12 +84,15 @@ router.post("/forgot-password", async (req, res) => {
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
     // ✅ Nodemailer setup
     const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // 465 mate true jaruri
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  connectionTimeout: 10000
+});
 
     await transporter.sendMail({
       from: `"Support Team" <${process.env.EMAIL_USER}>`,
