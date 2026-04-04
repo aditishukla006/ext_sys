@@ -8,6 +8,8 @@
 "https://*.indiamart.com/*",
 "https://ext-sys.onrender.com/*"
 ],
+
+
 "content_scripts": [
 {
    "matches": ["https://seller.indiamart.com/bltxn/?pref=recent"],

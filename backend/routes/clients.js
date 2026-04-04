@@ -83,7 +83,6 @@ router.post("/forgot-password", async (req, res) => {
 const resetLink = `https://dapper-granita-9191da.netlify.app/index.html?token=${resetToken}`;
     // ✅ brevo email sending
 const axios = require("axios");
-
 await axios.post(
   "https://api.brevo.com/v3/smtp/email",
   {
@@ -261,8 +260,24 @@ router.put("/daily-leads", async (req, res) => {
 
   res.json({ success: true, dailyLeadLimit: client.dailyLeadLimit });
 });
+function getISTDateString(date = new Date()) {
+  return new Date(
+    date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  )
+    .toISOString()
+    .split("T")[0];
+}
 
 // INCREMENT lead
+// 🔥 IST date helper
+function getISTDateString(date = new Date()) {
+  return new Date(
+    date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+  )
+    .toISOString()
+    .split("T")[0];
+}
+
 router.post("/increment-lead", async (req, res) => {
   const clientKey = req.headers["x-client-key"];
   if (!clientKey) return res.status(401).json({ error: "Key required" });
@@ -270,9 +285,11 @@ router.post("/increment-lead", async (req, res) => {
   const client = await Client.findOne({ clientKey });
   if (!client) return res.status(404).json({ error: "Client not found" });
 
-  const today = new Date().toISOString().split("T")[0];
+  // ✅ IST based date
+  const today = getISTDateString();
+
   const last = client.lastLeadDate
-    ? client.lastLeadDate.toISOString().split("T")[0]
+    ? getISTDateString(new Date(client.lastLeadDate))
     : null;
 
   let taken = last === today ? client.leadsTakenToday || 0 : 0;
@@ -285,7 +302,10 @@ router.post("/increment-lead", async (req, res) => {
 
   await Client.updateOne(
     { clientKey },
-    { leadsTakenToday: taken, lastLeadDate: new Date(today) }
+    {
+      leadsTakenToday: taken,
+      lastLeadDate: new Date() // 🔥 IMPORTANT (full date store karo)
+    }
   );
 
   res.json({ success: true, leadsTakenToday: taken });
