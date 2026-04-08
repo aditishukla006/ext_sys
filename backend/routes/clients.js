@@ -23,7 +23,6 @@ router.post("/login", async (req, res) => {
       const clientKey = crypto.randomBytes(32).toString("hex");
 
       const hashedPassword = await bcrypt.hash(password, 10);
-
       client = await Client.create({
         email: emailTrim,
         password: hashedPassword,
