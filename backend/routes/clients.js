@@ -4,7 +4,7 @@ const Client = require("../models/client");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 require("dotenv").config();
-const verifyClient = require("../middlewares/verifyClient");
+const verifyClient = require("../middleware/verifyClient");
 /* ===============================
    CREATE / GET CLIENT
 ================================ */
