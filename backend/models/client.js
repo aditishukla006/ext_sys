@@ -26,7 +26,12 @@ const clientSchema = new mongoose.Schema(
       blockedStates: { type: [String], default: [] },
       blockedCities: { type: [String], default: [] }
     },
-
+   dailyLeadsHistory: [
+      {
+        date: { type: String }, // "2026-04-16"
+        leadsTaken: { type: Number, default: 0 }
+      }
+    ],
     dailyLeadLimit: { type: Number, default: null },
     leadsTakenToday: { type: Number, default: 0 },
     lastLeadDate: { type: Date, default: null },

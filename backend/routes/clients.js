@@ -214,7 +214,9 @@ router.get("/daily-leads", verifyClient, async (req, res) => {
   res.json({
     dailyLeadLimit: client.dailyLeadLimit,
     leadsTakenToday: client.leadsTakenToday,
-    lastLeadDate: client.lastLeadDate
+    lastLeadDate: client.lastLeadDate,
+    history: client.dailyLeadsHistory // ✅ Last 10 days
+
   });
 });
 
@@ -258,10 +260,28 @@ router.post("/increment-lead", verifyClient, async (req, res) => {
   }
 
   taken++;
+ // ✅ Update history - keep only last 10 days
+  let history = client.dailyLeadsHistory || [];
+  
+  const existingIndex = history.findIndex(h => h.date === today);
+  if (existingIndex !== -1) {
+    history[existingIndex].leadsTaken = taken;
+  } else {
+    history.push({ date: today, leadsTaken: taken });
+  }
+
+  // Keep only last 10 days
+  if (history.length > 10) {
+    history = history.slice(-10);
+  }
 
   await Client.updateOne(
     { clientKey: client.clientKey },
-    { leadsTakenToday: taken, lastLeadDate: new Date() }
+    { 
+      leadsTakenToday: taken, 
+      lastLeadDate: new Date(),
+      dailyLeadsHistory: history  // ✅ ADD THIS
+    }
   );
 
   res.json({ success: true, leadsTakenToday: taken });
@@ -274,6 +294,7 @@ router.delete("/daily-leads", verifyClient, async (req, res) => {
   client.dailyLeadLimit = null;
   client.leadsTakenToday = 0;
   client.lastLeadDate = null;
+    client.dailyLeadsHistory = []; // ✅ Clear history
   await client.save();
 
   res.json({ success: true, message: "Daily lead info cleared" });
