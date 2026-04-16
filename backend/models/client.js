@@ -32,6 +32,10 @@ const clientSchema = new mongoose.Schema(
     lastLeadDate: { type: Date, default: null },
     active: { type: Boolean, default: true },
 
+    canReactivate: { type: Boolean, default: true },
+    deactivatedAt: { type: Date, default: null },
+    deactivationReason: { type: String, default: null },
+
     // 🔐 Forgot Password Fields
     resetToken: { type: String },
     resetTokenExpiry: { type: Date }
@@ -39,20 +43,22 @@ const clientSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-// ✅ Deactivate account
+
 clientSchema.methods.deactivateAccount = function(reason = null) {
   this.active = false;
+  this.canReactivate = true;  // ✅ ADD THIS
   this.deactivatedAt = new Date();
   this.deactivationReason = reason;
   return this.save();
 };
 
-// ✅ Reactivate (Activate) account
+// ✅ Reactivate account
 clientSchema.methods.reactivateAccount = function() {
   if (!this.canReactivate) {
     throw new Error("Account cannot be reactivated");
   }
-  this.active = true;  // ✅ FIXED
+  this.active = true;
+  this.canReactivate = true;
   this.deactivatedAt = null;
   this.deactivationReason = null;
   return this.save();
