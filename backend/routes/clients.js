@@ -326,4 +326,91 @@ router.delete("/daily-leads", async (req, res) => {
   res.json({ success: true, message: "Daily lead info cleared" });
 });
 
+// routes/clients.js ma add karo (end ma, module.exports se pehle)
+
+/* ===============================
+   ACCOUNT DEACTIVATE / ACTIVATE
+================================ */
+
+// DEACTIVATE account
+router.post("/deactivate", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const { reason } = req.body;
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    if (!client.active) {
+      return res.status(400).json({ error: "Account already deactivated" });
+    }
+
+    await client.deactivateAccount(reason);
+
+    res.json({
+      success: true,
+      message: "Account deactivated successfully",
+      deactivatedAt: client.deactivatedAt
+    });
+
+  } catch (err) {
+    console.error("Deactivate error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ACTIVATE (REACTIVATE) account
+router.post("/activate", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    if (client.active) {
+      return res.status(400).json({ error: "Account is already active" });
+    }
+
+    if (!client.canReactivate) {
+      return res.status(403).json({ error: "Account cannot be reactivated (permanently disabled)" });
+    }
+
+    await client.reactivateAccount();
+
+    res.json({
+      success: true,
+      message: "Account activated successfully"
+    });
+
+  } catch (err) {
+    console.error("Activate error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET account status
+router.get("/account-status", async (req, res) => {
+  try {
+    const clientKey = req.headers["x-client-key"];
+    if (!clientKey) return res.status(401).json({ error: "Key required" });
+
+    const client = await Client.findOne({ clientKey });
+    if (!client) return res.status(404).json({ error: "Client not found" });
+
+    res.json({
+      active: client.active,
+      deactivatedAt: client.deactivatedAt,
+      deactivationReason: client.deactivationReason,
+      canReactivate: client.canReactivate
+    });
+
+  } catch (err) {
+    console.error("Account status error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 module.exports = router;

@@ -39,5 +39,22 @@ const clientSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+// ✅ Deactivate account
+clientSchema.methods.deactivateAccount = function(reason = null) {
+  this.active = false;
+  this.deactivatedAt = new Date();
+  this.deactivationReason = reason;
+  return this.save();
+};
 
+// ✅ Reactivate (Activate) account
+clientSchema.methods.reactivateAccount = function() {
+  if (!this.canReactivate) {
+    throw new Error("Account cannot be reactivated");
+  }
+  this.active = true;  // ✅ FIXED
+  this.deactivatedAt = null;
+  this.deactivationReason = null;
+  return this.save();
+};
 module.exports = mongoose.model("Client", clientSchema);
