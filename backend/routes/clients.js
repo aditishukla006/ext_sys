@@ -203,6 +203,36 @@ router.put("/location-rules", verifyClient, async (req, res) => {
   }
 });
 
+//allow state
+// GET allowed states
+router.get("/allowed-states", verifyClient, async (req, res) => {
+  const client = req.client;
+  res.json({
+    allowedStates: client.locationRules?.allowedStates || []
+  });
+});
+
+// PUT allowed states
+router.put("/allowed-states", verifyClient, async (req, res) => {
+  try {
+    const client = req.client;
+
+    if (!Array.isArray(req.body.allowedStates)) {
+      return res.status(400).json({ error: "allowedStates array required" });
+    }
+
+    const updated = req.body.allowedStates.map(s => s.toLowerCase().trim());
+
+    await Client.updateOne(
+      { clientKey: client.clientKey },
+      { $set: { "locationRules.allowedStates": updated } }
+    );
+
+    res.json({ success: true, allowedStates: updated });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 /* ===============================
    DAILY LEAD LIMIT
 ================================ */
