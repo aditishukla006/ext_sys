@@ -277,44 +277,56 @@ function getISTDateString(date = new Date()) {
 }
 
 router.post("/increment-lead", verifyClient, async (req, res) => {
-  const client = req.client; // ✅
-  const today = getISTDateString();
-  const last = client.lastLeadDate
-    ? getISTDateString(new Date(client.lastLeadDate))
-    : null;
+  try {
+    const client = req.client;
+    const today = getISTDateString();
+    const last = client.lastLeadDate
+      ? getISTDateString(new Date(client.lastLeadDate))
+      : null;
 
-  let taken = last === today ? client.leadsTakenToday || 0 : 0;
+    // ✅ Fresh data fetch — stale data avoid
+    const freshClient = await Client.findOne({ clientKey: client.clientKey });
 
-  if (client.dailyLeadLimit && taken >= client.dailyLeadLimit) {
-    return res.status(403).json({ error: "Daily lead limit reached" });
-  }
+    let taken = last === today ? freshClient.leadsTakenToday || 0 : 0;
 
-  taken++;
- // ✅ Update history - keep only last 10 days
-  let history = client.dailyLeadsHistory || [];
-  
-  const existingIndex = history.findIndex(h => h.date === today);
-  if (existingIndex !== -1) {
-    history[existingIndex].leadsTaken = taken;
-  } else {
-    history.push({ date: today, leadsTaken: taken });
-  }
-
-  // Keep only last 10 days
-  if (history.length > 10) {
-    history = history.slice(-10);
-  }
-
-  await Client.updateOne(
-    { clientKey: client.clientKey },
-    { 
-      leadsTakenToday: taken, 
-      lastLeadDate: new Date(),
-      dailyLeadsHistory: history  // ✅ ADD THIS
+    if (freshClient.dailyLeadLimit && taken >= freshClient.dailyLeadLimit) {
+      return res.status(403).json({ error: "Daily lead limit reached" });
     }
-  );
 
-  res.json({ success: true, leadsTakenToday: taken });
+    taken++;
+
+    let history = freshClient.dailyLeadsHistory || [];
+
+    const existingIndex = history.findIndex(h => h.date === today);
+    if (existingIndex !== -1) {
+      history[existingIndex].leadsTaken = taken;
+    } else {
+      history.push({ date: today, leadsTaken: taken });
+    }
+
+    if (history.length > 10) {
+      history = history.slice(-10);
+    }
+
+    // ✅ findOneAndUpdate — atomic operation
+    await Client.findOneAndUpdate(
+      { clientKey: client.clientKey },
+      {
+        $set: {
+          leadsTakenToday: taken,
+          lastLeadDate: new Date(),
+          dailyLeadsHistory: history
+        }
+      },
+      { new: true }
+    );
+
+    res.json({ success: true, leadsTakenToday: taken });
+
+  } catch (err) {
+    console.error("Increment lead error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // RESET daily leads
