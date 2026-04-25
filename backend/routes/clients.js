@@ -238,17 +238,45 @@ router.put("/allowed-states", verifyClient, async (req, res) => {
 ================================ */
 
 // GET daily lead info
+// 🔥 IST date helper (jo already hoy to duplicate na karso)
+function getISTDateString(date = new Date()) {
+  return new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }))
+    .toISOString()
+    .split("T")[0];
+}
+
+// GET daily lead info (FIXED)
 router.get("/daily-leads", verifyClient, async (req, res) => {
-  const client = req.client; // ✅
+  try {
+    const client = req.client;
 
-  res.json({
-    dailyLeadLimit: client.dailyLeadLimit,
-    leadsTakenToday: client.leadsTakenToday,
-    lastLeadDate: client.lastLeadDate,
-    history: client.dailyLeadsHistory // ✅ Last 10 days
+    const today = getISTDateString();
+    const last = client.lastLeadDate
+      ? getISTDateString(new Date(client.lastLeadDate))
+      : null;
 
-  });
+    const effectiveCount = last === today ? (client.leadsTakenToday || 0) : 0;
+
+    // optional: DB ma pan reset kari do so everywhere consistent rahe
+    if (last !== today && (client.leadsTakenToday || 0) !== 0) {
+      await Client.updateOne(
+        { clientKey: client.clientKey },
+        { $set: { leadsTakenToday: 0 } }
+      );
+    }
+
+    res.json({
+      dailyLeadLimit: client.dailyLeadLimit,
+      leadsTakenToday: effectiveCount,
+      lastLeadDate: client.lastLeadDate,
+      history: client.dailyLeadsHistory
+    });
+  } catch (err) {
+    console.error("Daily leads GET error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
+
 
 // SET daily lead limit
 router.put("/daily-leads", verifyClient, async (req, res) => {
@@ -258,34 +286,27 @@ router.put("/daily-leads", verifyClient, async (req, res) => {
   if (dailyLeadLimit !== null && dailyLeadLimit < 1)
     return res.status(400).json({ error: "Invalid limit" });
 
-  await Client.updateOne(
-    { clientKey: client.clientKey },
-    { dailyLeadLimit: dailyLeadLimit ?? null }
-  );
+await Client.updateOne(
+  { clientKey: client.clientKey },
+  { $set: { dailyLeadLimit: dailyLeadLimit ?? null } }
+);
+
 
   res.json({ success: true, dailyLeadLimit });
 });
 
-// INCREMENT lead
-// 🔥 IST date helper
-function getISTDateString(date = new Date()) {
-  return new Date(
-    date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
-  )
-    .toISOString()
-    .split("T")[0];
-}
-
+// INCREMENT le
 router.post("/increment-lead", verifyClient, async (req, res) => {
   try {
     const client = req.client;
     const today = getISTDateString();
-    const last = client.lastLeadDate
-      ? getISTDateString(new Date(client.lastLeadDate))
-      : null;
 
     // ✅ Fresh data fetch — stale data avoid
     const freshClient = await Client.findOne({ clientKey: client.clientKey });
+
+    const last = freshClient.lastLeadDate
+      ? getISTDateString(new Date(freshClient.lastLeadDate))
+      : null;
 
     let taken = last === today ? freshClient.leadsTakenToday || 0 : 0;
 
@@ -296,19 +317,11 @@ router.post("/increment-lead", verifyClient, async (req, res) => {
     taken++;
 
     let history = freshClient.dailyLeadsHistory || [];
-
     const existingIndex = history.findIndex(h => h.date === today);
-    if (existingIndex !== -1) {
-      history[existingIndex].leadsTaken = taken;
-    } else {
-      history.push({ date: today, leadsTaken: taken });
-    }
+    if (existingIndex !== -1) history[existingIndex].leadsTaken = taken;
+    else history.push({ date: today, leadsTaken: taken });
+    if (history.length > 10) history = history.slice(-10);
 
-    if (history.length > 10) {
-      history = history.slice(-10);
-    }
-
-    // ✅ findOneAndUpdate — atomic operation
     await Client.findOneAndUpdate(
       { clientKey: client.clientKey },
       {
@@ -322,12 +335,12 @@ router.post("/increment-lead", verifyClient, async (req, res) => {
     );
 
     res.json({ success: true, leadsTakenToday: taken });
-
   } catch (err) {
     console.error("Increment lead error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 // RESET daily leads
 router.delete("/daily-leads", verifyClient, async (req, res) => {
